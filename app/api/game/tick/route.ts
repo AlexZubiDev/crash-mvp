@@ -7,10 +7,18 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+const CRON_SECRET = process.env.CRON_SECRET
+
 const LOBBY_MS      = 10_000  // waiting period before round starts
 const POST_CRASH_MS =  3_000  // cooldown between crash and next waiting round
 
-export async function POST() {
+export async function POST(req: Request) {
+  const auth = req.headers.get('authorization')
+
+  if (auth !== `Bearer ${CRON_SECRET}`) {
+    return new Response('Unauthorized', { status: 401 })
+  }
+
   try {
     const now = Date.now()
 
@@ -27,11 +35,15 @@ export async function POST() {
           .from('crash_rounds')
           .update({ status: 'crashed' })
           .eq('id', round.id)
-          .neq('status', 'crashed')           // idempotent
+          .neq('status', 'crashed')
 
         await supabase
           .from('crash_bets')
-          .update({ status: 'lost', payout: 0, resolved_at: new Date().toISOString() })
+          .update({
+            status: 'lost',
+            payout: 0,
+            resolved_at: new Date().toISOString()
+          })
           .eq('round_id', round.id)
           .eq('status', 'active')
       }
@@ -50,7 +62,7 @@ export async function POST() {
           .from('crash_rounds')
           .update({ status: 'running' })
           .eq('id', round.id)
-          .eq('status', 'waiting')            // idempotent
+          .eq('status', 'waiting')
       }
     }
 
@@ -81,12 +93,6 @@ export async function POST() {
         const durationMs = Math.round((crashPoint - 1.0) / 0.03 * 100)
         const crashAt    = new Date(startAt.getTime() + durationMs)
 
-        // TODO: Race condition — concurrent tick calls can both read count === 0
-        // and both INSERT a waiting round. Safe mitigation: add a unique partial
-        // index in the DB:
-        //   CREATE UNIQUE INDEX one_active_round ON crash_rounds (status)
-        //   WHERE status IN ('waiting', 'running');
-        // Until then, duplicate waiting rounds are possible under high concurrency.
         await supabase.from('crash_rounds').insert({
           status:      'waiting',
           crash_point: crashPoint,
@@ -103,7 +109,7 @@ export async function POST() {
       })
     }
 
-    // ── Return current active round (crash_point never exposed here) ─────────
+    // ── Return current active round ─────────────────────────────────────────
 
     const { data: current } = await supabase
       .from('crash_rounds')
