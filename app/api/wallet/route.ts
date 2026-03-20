@@ -12,9 +12,9 @@ export async function GET() {
 
   const { data, error } = await adminClient
     .from('wallets')
-    .select('balance')
+    .select('id, balance')
     .eq('user_id', user.id)
-    .maybeSingle()
+    .limit(1)
 
   if (error) {
     return NextResponse.json(
@@ -23,12 +23,12 @@ export async function GET() {
     )
   }
 
-  if (!data) {
+  if (!data || data.length === 0) {
     return NextResponse.json(
       { error: 'Wallet no encontrada' },
       { status: 404 }
     )
   }
 
-  return NextResponse.json({ balance: Number(data.balance) })
+  return NextResponse.json({ balance: Number(data[0].balance) })
 }
