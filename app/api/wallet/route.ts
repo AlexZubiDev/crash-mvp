@@ -1,24 +1,32 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  "https://cduuipivbfuajmivskbe.supabase.co",
-  "sb_publishable__32lvjDicHJTOiozfAVP1w_mbwjMa-1"
-)
-
-const DEMO_USER_ID = '11111111-1111-1111-1111-111111111111'
+import { createClient } from '../../../utils/supabase/server'
+import { adminClient } from '../../../utils/supabase/admin'
 
 export async function GET() {
-  const { data, error } = await supabase
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  }
+
+  const { data, error } = await adminClient
     .from('wallets')
     .select('balance')
-    .eq('user_id', DEMO_USER_ID)
-    .single()
+    .eq('user_id', user.id)
+    .maybeSingle()
 
   if (error) {
     return NextResponse.json(
       { error: 'Error cargando saldo', details: error.message },
       { status: 500 }
+    )
+  }
+
+  if (!data) {
+    return NextResponse.json(
+      { error: 'Wallet no encontrada' },
+      { status: 404 }
     )
   }
 
