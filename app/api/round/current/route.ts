@@ -28,8 +28,21 @@ export async function GET() {
       .maybeSingle()
 
     if (!waiting) {
+      const { data: lastCrashed } = await supabase
+        .from('crash_rounds')
+        .select('crash_point')
+        .eq('status', 'crashed')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
       return NextResponse.json(
-        { success: false, error: 'No hay ninguna ronda activa' },
+        {
+          round: null,
+          lastCrash: lastCrashed?.crash_point
+            ? { crashPoint: Number(lastCrashed.crash_point) }
+            : null,
+        },
         { status: 404 }
       )
     }

@@ -130,10 +130,10 @@ export default function Home() {
 
   // ── Tick callback — drives global round state ─────────────────────────────
 
-  const callTick = async () => {
+  const callRound = async () => {
     try {
-      const res = await fetch('/api/game/tick', { method: 'POST' })
-      if (!res.ok) return
+      const res = await fetch('/api/round/current')
+      if (!res.ok && res.status !== 404) return
       const data = await res.json()
 
       if (!data.round) {
@@ -203,9 +203,9 @@ export default function Home() {
 
   useEffect(() => {
     const init = async () => {
-      const [walletRes, tickRes] = await Promise.all([
+      const [walletRes, roundRes] = await Promise.all([
         fetch('/api/wallet'),
-        fetch('/api/game/tick', { method: 'POST' }),
+        fetch('/api/round/current'),
       ])
 
       const walletData = await walletRes.json()
@@ -215,19 +215,17 @@ export default function Home() {
         setBalance(walletData.balance)
       }
 
-      if (tickRes.ok) {
-        const tickData = await tickRes.json()
-        if (tickData.round) {
-          const r: CurrentRound = tickData.round
-          setRoundId(r.id)
-          setRoundStatus(r.status as RoundStatus)
-          setRoundStartAt(r.start_at)
-          if (r.status === 'running' && r.start_at) {
-            startedAtRef.current = new Date(r.start_at).getTime()
-          }
-        } else if (tickData.lastCrash) {
-          setLastCrashPoint(tickData.lastCrash.crashPoint)
+      const roundData = await roundRes.json()
+      if (roundData.round) {
+        const r: CurrentRound = roundData.round
+        setRoundId(r.id)
+        setRoundStatus(r.status as RoundStatus)
+        setRoundStartAt(r.start_at)
+        if (r.status === 'running' && r.start_at) {
+          startedAtRef.current = new Date(r.start_at).getTime()
         }
+      } else if (roundData.lastCrash) {
+        setLastCrashPoint(roundData.lastCrash.crashPoint)
       }
 
       setLoading(false)
@@ -236,7 +234,7 @@ export default function Home() {
     init()
 
     // tickRef — 1s, drives backend state progression for all clients
-    tickRef.current = setInterval(callTick, 1_000)
+    tickRef.current = setInterval(callRound, 1_000)
 
     // displayRef — 100ms, drives visual multiplier animation
     startDisplayLoop()
