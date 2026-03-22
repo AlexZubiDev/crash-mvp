@@ -17,7 +17,16 @@ export async function GET() {
       .limit(1)
       .maybeSingle()
 
-    if (running) return NextResponse.json({ success: true, round: running })
+    if (running) {
+      if (running.crash_at && Date.now() >= new Date(running.crash_at).getTime()) {
+        await supabase
+          .from('crash_rounds')
+          .update({ status: 'crashed' })
+          .eq('id', running.id)
+        return NextResponse.json({ success: true, round: { ...running, status: 'crashed' } })
+      }
+      return NextResponse.json({ success: true, round: running })
+    }
 
     const { data: waiting } = await supabase
       .from('crash_rounds')
