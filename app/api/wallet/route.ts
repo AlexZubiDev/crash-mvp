@@ -7,7 +7,7 @@ export async function GET() {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
   if (authError || !user) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    return NextResponse.json({ error: 'No autorizado', version: 'wallet-v2' }, { status: 401 })
   }
 
   const { data, error } = await adminClient
@@ -18,17 +18,17 @@ export async function GET() {
 
   if (error) {
     return NextResponse.json(
-      { error: 'Error cargando saldo', details: error.message },
+      { error: 'Error cargando saldo', details: error.message, version: 'wallet-v2' },
       { status: 500 }
     )
   }
 
   if (!data || data.length === 0) {
     return NextResponse.json(
-      { error: 'Wallet no encontrada' },
+      { error: 'Wallet no encontrada', version: 'wallet-v2' },
       { status: 404 }
     )
   }
 
-  return NextResponse.json({ balance: Number(data[0].balance) })
+  return NextResponse.json({ balance: Number(data[0].balance), version: 'wallet-v2' })
 }
